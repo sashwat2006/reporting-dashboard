@@ -1,0 +1,1 @@
+Removed: generate_snapshots.py is deprecated and not used in the current dashboard app.

@@ -1,0 +1,21 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start FastAPI backend",
+      "type": "shell",
+      "command": ".\\backend-env\\Scripts\\Activate.ps1; uvicorn main:app --reload",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Start React frontend",
+      "type": "shell",
+      "command": "cd frontend; npm run dev",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

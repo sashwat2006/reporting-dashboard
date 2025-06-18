@@ -1,0 +1,1 @@
+Removed: html2pdf-loader.js is no longer needed for dashboard HTML download.

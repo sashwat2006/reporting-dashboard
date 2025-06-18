@@ -1,0 +1,3 @@
+<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
+
+This project is a unified internal reporting dashboard. The backend is FastAPI (Python) and the frontend is React (Vite). The backend should support Excel file uploads, parse department-specific KPIs, and provide endpoints for the frontend to fetch parsed data. The frontend should have department tabs, KPI visualizations, and date range toggling. No database is used; files are stored and parsed on-demand.

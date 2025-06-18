@@ -1,0 +1,1 @@
+Removed: auth.json is deprecated and not used in the current dashboard app.
