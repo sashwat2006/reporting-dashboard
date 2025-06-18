@@ -373,7 +373,7 @@ const renderEnhancedStrategyDashboard = () => (
             },
             {
               risk: "Technology Disruption",
-              level: "Medium",
+              level: "Low",
               impact: "Operations",
               mitigation: "Continuous R&D",
               probability: 45,
