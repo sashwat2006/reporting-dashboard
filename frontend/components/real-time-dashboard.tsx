@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useRealTimeData } from "@/hooks/use-real-time-data"
@@ -7,6 +8,13 @@ import { Activity } from "lucide-react"
 
 export function RealTimeDashboard() {
   const { data, loading, error, lastUpdated } = useRealTimeData(10000) // Update every 10 seconds
+  const [formattedTime, setFormattedTime] = useState("")
+
+  useEffect(() => {
+    if (lastUpdated) {
+      setFormattedTime(lastUpdated.toLocaleTimeString("en-US", { hour12: true }))
+    }
+  }, [lastUpdated])
 
   if (loading) {
     return <div className="flex items-center justify-center h-64">Loading real-time data...</div>
@@ -22,7 +30,7 @@ export function RealTimeDashboard() {
         <div>
           <h2 className="text-4xl font-bold tracking-tight mb-2">Live Dashboard</h2>
           <p className="text-lg text-muted-foreground">
-            Real-time data updates • Last updated: {lastUpdated.toLocaleTimeString()}
+            Real-time data updates • Last updated: {formattedTime}
           </p>
         </div>
         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-4 py-2">
