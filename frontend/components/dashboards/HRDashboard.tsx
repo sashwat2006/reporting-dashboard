@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,10 +23,57 @@ import {
   Car,
 } from "lucide-react";
 
+// Color class mappings for Tailwind (static, not dynamic)
+const colorClassMap = {
+  blue: {
+    from: "from-blue-500/20",
+    to: "to-blue-600/20",
+    border: "border-blue-500/30",
+    text: "text-blue-400",
+  },
+  green: {
+    from: "from-green-500/20",
+    to: "to-green-600/20",
+    border: "border-green-500/30",
+    text: "text-green-400",
+  },
+  orange: {
+    from: "from-orange-500/20",
+    to: "to-orange-600/20",
+    border: "border-orange-500/30",
+    text: "text-orange-400",
+  },
+  purple: {
+    from: "from-purple-500/20",
+    to: "to-purple-600/20",
+    border: "border-purple-500/30",
+    text: "text-purple-400",
+  },
+};
+
+type Metric = {
+  title: string;
+  value: string | number;
+  change: string;
+  icon: React.ElementType;
+  color: keyof typeof colorClassMap;
+};
+
 const renderEnhancedHRDashboard = () => {
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
+  const [hrData, setHrData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/dashboard/hr")
+      .then((res) => res.json())
+      .then((data) => {
+        setHrData(data || []);
+        setLoading(false);
+      });
+  }, []);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -94,69 +141,75 @@ const renderEnhancedHRDashboard = () => {
       )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {[
-          {
-            title: "Total Employees",
-            value: "1,247",
-            change: "+23 new hires",
-            icon: Users,
-            color: "blue",
-          },
-          {
-            title: "Attendance Rate",
-            value: "94.2%",
-            change: "Above average",
-            icon: Activity,
-            color: "green",
-          },
-          {
-            title: "Open Positions",
-            value: "34",
-            change: "12 in progress",
-            icon: Building2,
-            color: "orange",
-          },
-          {
-            title: "Employee Satisfaction",
-            value: "4.3/5",
-            change: "+0.2",
-            icon: Target,
-            color: "purple",
-          },
-        ].map((metric, index) => (
-          <Card
-            key={metric.title}
-            className="relative overflow-hidden bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur border-slate-700/50 hover:border-slate-600 transition-all duration-300 group"
-          >
-            <div
-              className={`absolute inset-0 bg-gradient-to-r from-${metric.color}-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
-            ></div>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 relative z-10">
-              <CardTitle className="text-sm font-medium text-slate-200">
-                {metric.title}
-              </CardTitle>
-              <div
-                className={`p-3 bg-gradient-to-br from-${metric.color}-500/20 to-${metric.color}-600/20 rounded-xl border border-${metric.color}-500/30`}
+        {loading ? (
+          <div>Loading...</div>
+        ) : (
+          [
+            {
+              title: "Total Employees",
+              value: hrData.length.toLocaleString(),
+              change: `+${hrData.length} total`,
+              icon: Users,
+              color: "blue" as const,
+            },
+            {
+              title: "Attendance Rate",
+              value: "94.2%",
+              change: "Above average",
+              icon: Activity,
+              color: "green" as const,
+            },
+            {
+              title: "Open Positions",
+              value: "34",
+              change: "12 in progress",
+              icon: Building2,
+              color: "orange" as const,
+            },
+            {
+              title: "Employee Satisfaction",
+              value: "4.3/5",
+              change: "+0.2",
+              icon: Target,
+              color: "purple" as const,
+            },
+          ].map((metric, index) => {
+            const color = colorClassMap[metric.color];
+            const Icon = metric.icon;
+            return (
+              <Card
+                key={metric.title}
+                className="relative overflow-hidden bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur border-slate-700/50 hover:border-slate-600 transition-all duration-300 group"
               >
-                <metric.icon className={`h-5 w-5 text-${metric.color}-400`} />
-              </div>
-            </CardHeader>
-            <CardContent className="pt-2 relative z-10">
-              <div className="text-3xl font-bold mb-2 text-white">
-                {metric.value}
-              </div>
-              <p className="text-sm text-slate-300">
-                <span className="text-green-400 flex items-center">
-                  {metric.change.includes("+") && (
-                    <ArrowUp className="h-4 w-4 mr-1" />
-                  )}
-                  {metric.change}
-                </span>
-                {metric.title === "Total Employees" && " this quarter"}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+                <div
+                  className={`absolute inset-0 bg-gradient-to-r ${color.from} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
+                ></div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 relative z-10">
+                  <CardTitle className="text-sm font-medium text-slate-200">
+                    {metric.title}
+                  </CardTitle>
+                  <div
+                    className={`p-3 bg-gradient-to-br ${color.from} ${color.to} rounded-xl border ${color.border}`}
+                  >
+                    <Icon className={`h-5 w-5 ${color.text}`} />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-2 relative z-10">
+                  <div className="text-3xl font-bold mb-2 text-white">
+                    {metric.value}
+                  </div>
+                  <p className="text-sm text-slate-300">
+                    <span className="text-green-400 flex items-center">
+                      {metric.change.includes("+") && <ArrowUp className="h-4 w-4 mr-1" />}
+                      {metric.change}
+                    </span>
+                    {metric.title === "Total Employees" && " this quarter"}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
       </div>
 
       {/* Department Breakdown and Employee Activities */}

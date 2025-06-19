@@ -8,6 +8,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Database Tables Structure
 export interface DashboardMetrics {
+  revenue: any
   id: string
   metric_type: "revenue" | "customers" | "uptime" | "employees"
   value: number

@@ -23,6 +23,7 @@ import requests
 import glob
 import base64
 import subprocess
+from routes.upload_hr import router as upload_hr_router
 
 # Load environment variables from .env file
 load_dotenv()
@@ -32,6 +33,10 @@ print("CLIENT_ID:", os.getenv("CLIENT_ID"))
 print("TENANT_ID:", os.getenv("TENANT_ID"))
 print("CLIENT_SECRET:", os.getenv("CLIENT_SECRET"))
 print("REDIRECT_URI:", os.getenv("REDIRECT_URI"))
+
+# Debug: Print Supabase env variables after loading .env
+print("SUPABASE_URL:", os.getenv("SUPABASE_URL"))
+print("SUPABASE_SERVICE_ROLE_KEY:", os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
 
 # Read environment variables
 CLIENT_ID = os.getenv("CLIENT_ID")
@@ -58,6 +63,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Define upload directory
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploaded_reports")
 # Ensure upload directory exists
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -328,122 +335,4 @@ def download_file(department: str, filename: str, request: Request):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename=filename)
 
-@app.post("/send-status-update")
-def send_status_update(background_tasks: BackgroundTasks, request: Request):
-    """
-    Send a weekly status update email with dashboard snapshots as images (linked to dashboards).
-    Uses Microsoft Graph API for company accounts.
-    Now: Runs snapshot script for 'wireless' dashboards before sending email.
-    """
-    # Config
-    CLIENT_ID = os.getenv("CLIENT_ID")
-    CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-    TENANT_ID = os.getenv("TENANT_ID")
-    RECIPIENTS = os.getenv("STATUS_UPDATE_RECIPIENTS", "").split(",")
-    DASHBOARD_BASE_URL = os.getenv("DASHBOARD_BASE_URL", "http://localhost:3000/")
-    SNAPSHOT_DIR = os.path.join(os.getcwd(), "frontend", "public", "static", "snapshots")
-    SENDER = os.getenv("GRAPH_SENDER") or os.getenv("OUTLOOK_USER")
-
-    # Run snapshot script for 'wireless' only
-    try:
-        result = subprocess.run([
-            os.environ.get("PYTHON_EXECUTABLE", "python"),
-            os.path.join(os.getcwd(), "generate_snapshots.py"),
-            "wireless"
-        ], capture_output=True, text=True, timeout=120)
-        if result.returncode != 0:
-            print("[Snapshot] Error:", result.stderr)
-            raise HTTPException(status_code=500, detail=f"Snapshot generation failed: {result.stderr}")
-        print("[Snapshot] Output:", result.stdout)
-    except Exception as e:
-        print("[Snapshot] Exception:", e)
-        raise HTTPException(status_code=500, detail=f"Snapshot generation failed: {e}")
-
-    # Find all snapshot images (wireless only)
-    image_files = [f for f in glob.glob(os.path.join(SNAPSHOT_DIR, "wireless_*.png"))]
-    if not image_files:
-        raise HTTPException(status_code=404, detail="No wireless dashboard snapshots found.")
-
-    # Compose HTML with images and links
-    html = """
-    <html><body>
-    <h2 style='font-family:Montserrat,sans-serif;color:#0a1833;'>Weekly Dashboard Status Update</h2>
-    <p style='font-size:1.1em;'>See the latest wireless dashboards below. Click any image to view the live dashboard.</p>
-    <div style='display:flex;flex-wrap:wrap;gap:32px;'>
-    """
-    attachments = []
-    for img_path in image_files:
-        img_name = os.path.basename(img_path)
-        dashboard_name = os.path.splitext(img_name)[0].replace("_", " ")[9:]  # remove 'wireless_'
-        dashboard_url = f"{DASHBOARD_BASE_URL}?department=wireless&dashboard={dashboard_name.replace(' ', '%20')}"
-        cid = img_name.replace('.', '_')
-        html += f"<div style='text-align:center;'><a href='{dashboard_url}'><img src='cid:{cid}' style='max-width:400px;border-radius:12px;box-shadow:0 2px 16px #00B8D9;' alt='{dashboard_name}'/></a><br/><span style='font-weight:600;font-size:1.1em;'>{dashboard_name}</span></div>"
-        # Prepare attachment for Graph API
-        with open(img_path, "rb") as f:
-            img_bytes = f.read()
-        attachments.append({
-            "@odata.type": "#microsoft.graph.fileAttachment",
-            "name": img_name,
-            "contentType": "image/png",
-            "contentBytes": base64.b64encode(img_bytes).decode(),
-            "isInline": True,
-            "contentId": cid
-        })
-    html += "</div></body></html>"
-
-    def send_graph_email():
-        # 1. Get access token
-        token_url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
-        data = {
-            "client_id": CLIENT_ID,
-            "scope": "https://graph.microsoft.com/.default",
-            "client_secret": CLIENT_SECRET,
-            "grant_type": "client_credentials"
-        }
-        token_resp = requests.post(token_url, data=data)
-        if token_resp.status_code != 200:
-            print("[Graph] Token error:", token_resp.text)
-            return
-        access_token = token_resp.json().get("access_token")
-        # 2. Send email
-        graph_url = f"https://graph.microsoft.com/v1.0/users/{SENDER}/sendMail"
-        message = {
-            "message": {
-                "subject": "Weekly Wireless Status Update",
-                "body": {
-                    "contentType": "HTML",
-                    "content": html
-                },
-                "toRecipients": [{"emailAddress": {"address": r.strip()}} for r in RECIPIENTS if r.strip()],
-                "attachments": attachments
-            },
-            "saveToSentItems": "true"
-        }
-        headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
-        resp = requests.post(graph_url, json=message, headers=headers)
-        if resp.status_code >= 400:
-            print("[Graph] SendMail error:", resp.text)
-        else:
-            print("[Graph] Email sent!")
-
-    background_tasks.add_task(send_graph_email)
-    return {"status": "Wireless email send initiated (Graph API)"}
-
-    from fastapi import UploadFile, File
-
-@app.post("/api/dashboard/hr/upload")
-async def upload_hr_excel(file: UploadFile = File(...)):
-    contents = await file.read()
-    
-    # Parse the Excel file with pandas
-    try:
-        df = pd.read_excel(BytesIO(contents))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid Excel file: {e}")
-
-    # Just return a confirmation for now
-    return {
-        "filename": file.filename,
-        "rows": len(df),
-        "columns": list(df.columns)
-    }
+app.include_router(upload_hr_router)
